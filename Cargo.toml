@@ -1,0 +1,8 @@
+[package]
+name = "phil_os"
+version = "0.1.0"
+authors = [ "Philipp Opperman <dev@phil-opp.com>"
+          , "Stuart Terrett <shterrett@gmail.com>"]
+
+[lib]
+crate-type = ["staticlib"]

@@ -30,7 +30,7 @@ $(iso): $(kernel) $(grub_cfg)
 	@rm -r build/isofiles
 
 $(kernel): kernel $(rust_os) $(assembly_object_files) $(linker_script)
-	@ld -n -T $(linker_script) -o $(kernel) \
+	@ld -n --gc-sections -T $(linker_script) -o $(kernel) \
 		$(assembly_object_files) $(rust_os)
 
 # compile assembly files
@@ -39,4 +39,4 @@ build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
 	@nasm -felf64 $< -o $@
 
 kernel:
-	@xargo build --target $(target)
+	@RUST_TARGET_PATH=$(shell pwd) xargo build --target $(target)

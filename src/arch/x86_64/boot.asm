@@ -86,7 +86,7 @@ check_long_mode:
 
 set_up_page_tables:
   ; recursively map the last p4 entry to the p4 table
-  mox eax, p4_table
+  mov eax, p4_table
   or eax, 0b11
   mov [p4_table + 511 * 8], eax
 

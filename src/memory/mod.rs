@@ -2,6 +2,7 @@ pub mod area_frame_allocator;
 mod paging;
 
 use self::paging::PhysicalAddress;
+pub use self::paging::test_paging;
 
 pub const PAGE_SIZE: usize = 4096;
 

@@ -1,11 +1,12 @@
-use memory::PAGE_SIZE;
 mod table;
 mod entry;
+mod temporary_page;
 
 pub use self::entry::*;
-use memory::{ Frame, FrameAllocator };
+use memory::{ Frame, FrameAllocator, PAGE_SIZE };
 use self::table::{ Table, Level4 };
 use core::ptr::Unique;
+use self::temporary_page::TemporaryPage;
 
 const ENTRY_COUNT: usize = 512;
 
@@ -127,11 +128,44 @@ impl ActivePageTable {
         .and_then(|p1| p1[page.p1_index()].pointed_frame())
         .or_else(huge_page)
     }
+
+    pub fn with<F>(&mut self,
+                   table: &mut InactivePageTable,
+                   f: F)
+        where F: FnOnce(&mut ActivePageTable) {
+        use x86_64::instructions::tlb;
+
+        self.p4_mut()[511].set(table.p4_frame.clone(), PRESENT | WRITABLE);
+        tlb::flush_all();
+
+        f(self);
+    }
+}
+
+pub struct InactivePageTable {
+    p4_frame: Frame
+}
+
+impl InactivePageTable {
+    pub fn new(frame: Frame,
+               active_table: &mut ActivePageTable,
+               temporary_page: &mut TemporaryPage
+               ) -> InactivePageTable {
+        {
+            let table = temporary_page.map_table_frame(frame.clone(), active_table);
+            table.zero();
+            table[511].set(frame.clone(), PRESENT | WRITABLE);
+        }
+        temporary_page.unmap(active_table);
+
+        InactivePageTable { p4_frame: frame }
+    }
 }
 
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Page {
     number: usize
 }

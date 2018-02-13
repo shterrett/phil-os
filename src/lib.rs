@@ -17,6 +17,7 @@ mod vga_buffer;
 mod memory;
 
 use memory::area_frame_allocator::AreaFrameAllocator;
+use memory::FrameAllocator;
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
@@ -54,8 +55,13 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         memory_map_tag.memory_areas()
     );
 
+    enable_nxe_bit();
+    enable_write_protect_bit();
     memory::remap_the_kernel(&mut frame_allocator, boot_info);
     println!("It didn't crash!");
+
+    frame_allocator.allocate_frame();
+    println!("It still didn't crash");
 
     loop {};
 }
@@ -68,4 +74,20 @@ pub extern fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32
     println!("\n\nPANIC in {} at line {}:", file, line);
     println!("    {}", fmt);
     loop{}
+}
+
+fn enable_nxe_bit() {
+    use x86_64::registers::msr::{ IA32_EFER, rdmsr, wrmsr };
+
+    let nxe_bit = 1 << 11;
+    unsafe {
+        let efer = rdmsr(IA32_EFER);
+        wrmsr(IA32_EFER, efer | nxe_bit);
+    }
+}
+
+fn enable_write_protect_bit() {
+    use x86_64::registers::control_regs::{ cr0, cr0_write, Cr0 };
+
+    unsafe { cr0_write(cr0() | Cr0::WRITE_PROTECT) };
 }

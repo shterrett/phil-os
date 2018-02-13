@@ -62,6 +62,24 @@ impl ActivePageTable {
 
         temporary_page.unmap(self);
     }
+
+    pub fn switch(&mut self, new_table: InactivePageTable) -> InactivePageTable {
+        use x86_64::PhysicalAddress;
+        use x86_64::registers::control_regs;
+
+        let old_table = InactivePageTable {
+            p4_frame: Frame::containing_address(
+                        control_regs::cr3().0 as usize
+                      )
+        };
+
+        unsafe {
+            control_regs::cr3_write(PhysicalAddress(
+                    new_table.p4_frame.start_address() as u64));
+        }
+
+        old_table
+    }
 }
 
 pub struct InactivePageTable {
@@ -171,7 +189,7 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
             println!("mapping section at addr: {:#x}, size: {:#x}",
                      section.addr, section.size);
 
-            let flags = WRITABLE;
+            let flags = EntryFlags::from_elf_section_flags(section);
 
             let start_frame = Frame::containing_address(section.start_address());
             let end_frame = Frame::containing_address(section.end_address() - 1);
@@ -179,5 +197,23 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
                 mapper.identity_map(frame, flags, allocator);
             }
         }
+
+        let vga_buffer_frame = Frame::containing_address(0xb8000);
+        mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
+
+        let multiboot_start = Frame::containing_address(boot_info.start_address());
+        let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
+        for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
+            mapper.identity_map(frame, PRESENT, allocator);
+        }
     });
+
+    let old_table = active_table.switch(new_table);
+    println!("NEW TABLE!");
+
+    let old_p4_page = Page::containing_address(
+        old_table.p4_frame.start_address()
+    );
+    active_table.unmap(old_p4_page, allocator);
+    println!("guard page at {:#x}", old_p4_page.start_address());
 }

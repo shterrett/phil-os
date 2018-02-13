@@ -3,6 +3,7 @@ mod paging;
 
 use self::paging::PhysicalAddress;
 pub use self::paging::test_paging;
+pub use self::paging::remap_the_kernel;
 
 pub const PAGE_SIZE: usize = 4096;
 

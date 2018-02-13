@@ -19,7 +19,7 @@ mod memory;
 use memory::area_frame_allocator::AreaFrameAllocator;
 
 #[no_mangle]
-pub extern fn rust_main(multiboot_information_address: usize) {
+pub extern "C" fn rust_main(multiboot_information_address: usize) {
     let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
     let memory_map_tag = boot_info.memory_map_tag()
                                   .expect("Memory map tag required");
@@ -54,7 +54,8 @@ pub extern fn rust_main(multiboot_information_address: usize) {
         memory_map_tag.memory_areas()
     );
 
-    memory::test_paging(&mut frame_allocator);
+    memory::remap_the_kernel(&mut frame_allocator, boot_info);
+    println!("It didn't crash!");
 
     loop {};
 }

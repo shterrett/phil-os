@@ -3,6 +3,10 @@
 #![feature(const_fn)]
 #![feature(unique)]
 #![feature(ptr_internals)]
+#![feature(alloc)]
+#![feature(allocator_api)]
+#![feature(const_atomic_usize_new)]
+#![feature(global_allocator)]
 
 extern crate rlibc;
 extern crate volatile;
@@ -11,6 +15,10 @@ extern crate multiboot2;
 #[macro_use]
 extern crate bitflags;
 extern crate x86_64;
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate once;
 
 #[macro_use]
 mod vga_buffer;
@@ -18,50 +26,32 @@ mod memory;
 
 use memory::area_frame_allocator::AreaFrameAllocator;
 use memory::FrameAllocator;
+use memory::BumpAllocator;
+
+pub const HEAP_START: usize = 0o_000_001_000_000_0000;
+pub const HEAP_SIZE: usize = 100 * 1024;
+
+#[global_allocator]
+static HEAP_ALLOCATOR: BumpAllocator = BumpAllocator::new(HEAP_START, HEAP_START + HEAP_SIZE);
 
 #[no_mangle]
 pub extern "C" fn rust_main(multiboot_information_address: usize) {
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
-    let memory_map_tag = boot_info.memory_map_tag()
-                                  .expect("Memory map tag required");
-    println!("memory areas:");
-    for area in memory_map_tag.memory_areas() {
-        println!("    start: 0x{:x}, length: 0x{:x}",
-                    area.base_addr, area.length);
-    }
+    vga_buffer::clear_screen();
+    println!("HelloWorld{}", "!");
 
-    let elf_sections_tag = boot_info.elf_sections_tag()
-                                    .expect("Elf-sections tag required");
-
-    println!("kernel sections:");
-    for section in elf_sections_tag.sections() {
-        println!("    addr: 0x{:x}, size: 0x{:x}, flags: 0x{:x}",
-                 section.addr, section.size, section.flags);
-    }
-
-    let kernel_start = elf_sections_tag.sections().map(|s| s.addr).min().unwrap();
-    let kernel_end = elf_sections_tag.sections().map(|s| s.addr + s.size).max().unwrap();
-    let multiboot_start = multiboot_information_address;
-    let multiboot_end = multiboot_start + (boot_info.total_size as usize);
-
-    println!("kernel_start: 0x{:x}, kernel_end: 0x{:x}", kernel_start, kernel_end);
-    println!("multiboot_start: 0x{:x}, multiboot_end: 0x{:x}", multiboot_start, multiboot_end);
-
-    let mut frame_allocator = AreaFrameAllocator::new(
-        kernel_start as usize,
-        kernel_end as usize,
-        multiboot_start,
-        multiboot_end,
-        memory_map_tag.memory_areas()
-    );
+    let boot_info = unsafe {
+        multiboot2::load(multiboot_information_address)
+    };
 
     enable_nxe_bit();
     enable_write_protect_bit();
-    memory::remap_the_kernel(&mut frame_allocator, boot_info);
-    println!("It didn't crash!");
 
-    frame_allocator.allocate_frame();
-    println!("It still didn't crash");
+    memory::init(boot_info);
+
+    use alloc::boxed::Box;
+    let heap_test = Box::new(42);
+
+    println!("It did not crash!");
 
     loop {};
 }

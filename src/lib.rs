@@ -7,6 +7,7 @@
 #![feature(allocator_api)]
 #![feature(const_atomic_usize_new)]
 #![feature(global_allocator)]
+#![feature(abi_x86_interrupt)]
 
 extern crate rlibc;
 extern crate volatile;
@@ -20,10 +21,13 @@ extern crate alloc;
 #[macro_use]
 extern crate once;
 extern crate linked_list_allocator;
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use]
 mod vga_buffer;
 mod memory;
+mod interrupts;
 
 use memory::area_frame_allocator::AreaFrameAllocator;
 use memory::FrameAllocator;
@@ -60,6 +64,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     for i in 0..10000 {
         format!("Some String");
     }
+
+    interrupts::init();
+    x86_64::instructions::interrupts::int3();
 
     println!("It did not crash!");
 

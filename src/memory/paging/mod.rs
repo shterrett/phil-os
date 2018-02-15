@@ -9,6 +9,7 @@ pub use self::entry::*;
 use memory::{ Frame, FrameAllocator, PAGE_SIZE };
 use self::temporary_page::TemporaryPage;
 use self::mapper::Mapper;
+use core::ops::Add;
 
 const ENTRY_COUNT: usize = 512;
 
@@ -144,6 +145,15 @@ impl Page {
     }
 }
 
+impl Add<usize> for Page {
+    type Output = Page;
+
+    fn add(self, rhs: usize) -> Page {
+        Page { number: self.number + rhs }
+    }
+}
+
+#[derive(Clone)]
 pub struct PageIter {
     start: Page,
     end: Page

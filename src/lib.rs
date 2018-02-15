@@ -23,6 +23,7 @@ extern crate once;
 extern crate linked_list_allocator;
 #[macro_use]
 extern crate lazy_static;
+extern crate bit_field;
 
 #[macro_use]
 mod vga_buffer;
@@ -52,7 +53,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     enable_nxe_bit();
     enable_write_protect_bit();
 
-    memory::init(boot_info);
+    let mut memory_controller = memory::init(boot_info);
 
     unsafe {
         HEAP_ALLOCATOR.lock().init(HEAP_START, HEAP_START + HEAP_SIZE);
@@ -65,12 +66,23 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         format!("Some String");
     }
 
-    interrupts::init();
+    interrupts::init(&mut memory_controller);
     x86_64::instructions::interrupts::int3();
+
+    stack_overflow();
+
+    unsafe { // cause page fault
+        *(0xdeadbeaf as *mut u64) = 42;
+    }
+
 
     println!("It did not crash!");
 
     loop {};
+}
+
+fn stack_overflow() -> u64 {
+    u64::max_value() + stack_overflow()
 }
 
 #[lang = "eh_personality"] #[no_mangle] pub extern fn eh_personality() {}
